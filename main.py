@@ -42,19 +42,16 @@ def main():
     # Strategies
     Least20 = Strategy_Def.LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True)
     Highest20 = Strategy_Def.HighestCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=False)
-
-    Strategy_Def.Simulate_Strategy(Least20, trade_freq, CN_data, HK_data, AH_multiple)
-    Strategy_Def.Simulate_Strategy(Highest20, trade_freq, CN_data, HK_data, AH_multiple)
+    LH20_profit = Strategy_Def.CombineStrategy([Least20, Highest20], profit_merge=False)
+    Strategy_Def.Simulate_Strategy(LH20_profit, trade_freq, CN_data, HK_data, AH_multiple)
 
     # Display
-    LH20_profit = Strategy_Def.CombineStrategy([Least20, Highest20], profit_merge=True)
-    LH20_profit.record_merge()
     LH20_profit.info(dates=dates, name='Long Least 20 A Short Highest 20 A Profit')
     Least20.info(dates=dates, name='Long Least 20 A')
     Highest20.info(dates=dates, name='Short Highest 20 A')
 
-    # plt.plot(Least20.profit_record, label='Least20')
-    # plt.plot(Highest20.profit_record, label='Highest20')
+    plt.plot(Least20.profit_record, label='Least20')
+    plt.plot(Highest20.profit_record, label='Highest20')
     plt.plot(LH20_profit.profit_record, label='LH20 Profit')
     plt.plot(SSECI/SSECI[0], label='SSE CI')
     plt.plot(HSCEI/HSCEI[0], label='HSCEI')

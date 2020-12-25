@@ -50,10 +50,11 @@ class DescribeStrategy(object):
         else:
             return 1
 
-    def get_sharpe(self):
+    def convert_ret(self):
         self.ret_record = profit_2_ret(self.profit_record)
         self.trans_ret_record = profit_2_ret(self.trans_profit_record)
 
+    def get_sharpe(self):
         # If the transactions happen in a constant frequency, then compute its sharpe
         if len(self.trans_ret_record) > 10:
             return self.trans_ret_record.mean() / self.trans_ret_record.std()
@@ -69,20 +70,19 @@ class DescribeStrategy(object):
 
     # Calculate the Max Drawdown and details of this strategy
     def get_mdd(self):
-        profit_record = self.profit_record
         former_high, mdd_high, mdd_low, mdd = 0, 0, 0, 0
-        for i in range(len(profit_record)):
-            if profit_record[i] > profit_record[former_high]:
+        for i in range(len(self.profit_record)):
+            if self.profit_record[i] > self.profit_record[former_high]:
                 former_high = i
-            cur_mdd = 1 - profit_record[i] / profit_record[former_high]
+            cur_mdd = 1 - self.profit_record[i] / self.profit_record[former_high]
             if mdd < cur_mdd:
                 mdd = cur_mdd
                 mdd_high = former_high
                 mdd_low = i
 
         recover_date, duration = None, None
-        for i in range(mdd_high, len(profit_record)):
-            if profit_record[i] > profit_record[mdd_high]:
+        for i in range(mdd_high, len(self.profit_record)):
+            if self.profit_record[i] > self.profit_record[mdd_high]:
                 recover_date = i
                 duration = recover_date - mdd_high
                 break
@@ -211,10 +211,8 @@ class CombineStrategy(DescribeStrategy):
                 res_trans.append(Strategy.trans_profit_record)
 
             self.profit_record = np.array(res).mean(axis=0)
-            self.ret_record = profit_2_ret(self.profit_record)
-
             self.trans_profit_record = np.array(res_trans).mean(axis=0)
-            self.trans_ret_record = profit_2_ret(self.trans_profit_record)
+            self.convert_ret()
         else:
             # Merge the strategies through returns
             # This is index mode
@@ -261,17 +259,32 @@ class HighestCurAH(BasicStrategy):
             return np.argsort(cur)[(realvalue-self.stock_num):realvalue]
 
 
-def Simulate_Strategy(Strategy, trade_freq, CN_data, HK_data, AH_multiple):
+def Simulate_Strategy(Strats, trade_freq, CN_data, HK_data, AH_multiple):
     days, tickers = CN_data.shape
-    halted = False
+    if isinstance(Strats, BasicStrategy):
+        Strats_list = [Strats]
+    else:
+        Strats_list = Strats.Strategies
+
+    halted = [False]*len(Strats_list)
+
     for i in range(days):
         CN_data_info, HK_data_info, AH_info = CN_data[:i+1], HK_data[:i+1], AH_multiple[:i+1]
         CN_prices, HK_prices = CN_data[i], HK_data[i]
 
-        # Time to decide transactions
-        if halted or i % trade_freq == 0:
-            selects = Strategy.stock_select(CN_data_info=CN_data_info, HK_data_info=HK_data_info, AH_info=AH_info)
-            halted = (selects == 'keep')
-            Strategy.transaction(selects, CN_prices, HK_prices)
-        else:
-            Strategy.hold_profit(CN_prices, HK_prices)
+        for num in range(len(Strats_list)):
+            Strat = Strats_list[num]
+
+            # Time to decide transactions
+            if halted[num] or i % trade_freq == 0:
+                selects = Strat.stock_select(CN_data_info=CN_data_info, HK_data_info=HK_data_info, AH_info=AH_info)
+                halted[num] = (selects == 'keep')
+                Strat.transaction(selects, CN_prices, HK_prices)
+            else:
+                Strat.hold_profit(CN_prices, HK_prices)
+
+    for Strat in Strats_list:
+        Strat.convert_ret()
+
+    if not isinstance(Strats, BasicStrategy):
+        Strats.record_merge()
