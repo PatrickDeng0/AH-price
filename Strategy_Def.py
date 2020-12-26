@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 def ret_2_profit(rets):
-    return np.cumprod(rets+1)
+    return np.nancumprod(rets+1)
 
 
 def profit_2_ret(profit):
@@ -32,6 +32,7 @@ class DescribeStrategy(object):
         # trans_profit_record: record interval returns between each two transactions
         self.profit_record = np.array([])
         self.trans_profit_record = np.array([])
+        self.trans_date = np.array([], dtype=int)
         self.ret_record = np.array([])
         self.trans_ret_record = np.array([])
 
@@ -57,7 +58,7 @@ class DescribeStrategy(object):
     def get_sharpe(self):
         # If the transactions happen in a constant frequency, then compute its sharpe
         if len(self.trans_ret_record) > 10:
-            return self.trans_ret_record.mean() / self.trans_ret_record.std()
+            return np.nanmean(self.trans_ret_record) / np.nanstd(self.trans_ret_record)
 
         # If there is no transactions at all, then compute the sharpe from daily return series
         # By default using monthly period as an epoch (22 trading days)
@@ -65,8 +66,8 @@ class DescribeStrategy(object):
             period = 22
             cut_ret_record = self.ret_record[-(len(self.ret_record)//period)*period:]
             cut_ret_record = cut_ret_record.reshape((-1, period))
-            merge_ret_record = cut_ret_record.sum(axis=1)
-            return merge_ret_record.mean() / merge_ret_record.std()
+            merge_ret_record = np.nansum(cut_ret_record, axis=1)
+            return np.nanmean(merge_ret_record) / np.nanstd(merge_ret_record)
 
     # Calculate the Max Drawdown and details of this strategy
     def get_mdd(self):
@@ -94,7 +95,7 @@ class DescribeStrategy(object):
         print('========================================')
         print('========================================')
         print('Display the profit of strategy', name)
-        print('Annual Return:', self.ret_record.mean() * 252)
+        print('Annual Return:', np.nanmean(self.ret_record) * 252)
         print('Sharpe:', sharpe)
         print('Max drawdown:', mdd)
         print('Max drawdown start date:', dates[mdd_high])
@@ -123,7 +124,7 @@ class BasicStrategy(DescribeStrategy):
 
     # For each stock, design the stock selection logic according to the data
     # Customize in each strategy
-    def stock_select(self, *args):
+    def stock_select(self, *args) -> np.ndarray:
         pass
 
     # Given the new stocks to hold, calculate the trading signal to generate
@@ -140,7 +141,7 @@ class BasicStrategy(DescribeStrategy):
         return prices
 
     # Calculate the profit from transaction
-    def transaction(self, stocks, CN_prices, HK_prices):
+    def transaction(self, stocks, CN_prices, HK_prices, date):
         prices = self.prices_select(CN_prices, HK_prices)
 
         # Selection result shows that we should hold all the stocks and wait
@@ -164,6 +165,7 @@ class BasicStrategy(DescribeStrategy):
             new_profit = self.profit * (1 + ret)
             self.profit_record = np.append(self.profit_record, new_profit)
             self.trans_profit_record = np.append(self.trans_profit_record, new_profit)
+            self.trans_date = np.append(self.trans_date, date)
 
             # Update properties
             # Store the profit of this transaction to calculate the next transaction return
@@ -192,6 +194,39 @@ class BasicStrategy(DescribeStrategy):
         self.prices = prices
 
 
+# The Strategy that track an INDEX!
+class IndexStrategy(BasicStrategy):
+    def __init__(self, trans_fee, market, long, profit):
+        super().__init__(trans_fee, market, long)
+
+        # Long an index, simply record its value
+        if self.long:
+            self.profit_record = profit
+        # Short an index, convert its value
+        else:
+            self.profit_record = 1/profit
+        self.ret_record = profit_2_ret(self.profit_record)
+
+    def transaction(self, *args):
+        pass
+
+    def hold_profit(self, *args):
+        pass
+
+    def stock_select(self, *args):
+        pass
+
+    def convert_ret(self):
+        pass
+
+    # For IndexStrategy, we didn't record transaction
+    # For compute the profit between transactions, we set its profit series manually
+    def set_trans_dates(self, trans_date):
+        self.trans_date = trans_date
+        self.trans_profit_record = self.profit_record[trans_date]
+        self.trans_ret_record = profit_2_ret(self.trans_profit_record)
+
+
 # Combine the strategies to describe their performance together
 class CombineStrategy(DescribeStrategy):
     def __init__(self, Strategies, profit_merge):
@@ -202,6 +237,18 @@ class CombineStrategy(DescribeStrategy):
         assert isinstance(self.profit_merge, bool)
 
     def record_merge(self):
+        # Set the transactions days for this CombinaStrategy
+        # Especially when there is any index strategy in the combination
+        for Strategy in self.Strategies:
+            if len(Strategy.trans_date) > 0:
+                self.trans_date = Strategy.trans_date
+                break
+        if len(self.trans_date) > 0:
+            for Strategy in self.Strategies:
+                # If a strategy is an Index Strategy, then we need to set its trans_dates in advance
+                if isinstance(Strategy, IndexStrategy):
+                    Strategy.set_trans_dates(self.trans_date)
+
         if self.profit_merge:
             # Merge the strategies through profits
             # This is trading mode
@@ -210,9 +257,10 @@ class CombineStrategy(DescribeStrategy):
                 res.append(Strategy.profit_record)
                 res_trans.append(Strategy.trans_profit_record)
 
-            self.profit_record = np.array(res).mean(axis=0)
-            self.trans_profit_record = np.array(res_trans).mean(axis=0)
+            self.profit_record = np.mean(np.array(res), axis=0)
+            self.trans_profit_record = np.mean(np.array(res_trans), axis=0)
             self.convert_ret()
+
         else:
             # Merge the strategies through returns
             # This is index mode
@@ -221,50 +269,19 @@ class CombineStrategy(DescribeStrategy):
                 res.append(Strategy.ret_record)
                 res_trans.append(Strategy.trans_ret_record)
 
-            self.ret_record = np.array(res).mean(axis=0)
+            self.ret_record = np.nanmean(np.array(res), axis=0)
             self.profit_record = ret_2_profit(self.ret_record)
 
-            self.trans_ret_record = np.array(res_trans).mean(axis=0)
+            self.trans_ret_record = np.nanmean(np.array(res_trans), axis=0)
             self.trans_profit_record = ret_2_profit(self.trans_ret_record)
-
-
-# Select the A stocks with least AH multiplier
-class LeastCurAH(BasicStrategy):
-    def __init__(self, trans_fee, stock_num, market, long):
-        super().__init__(trans_fee, market, long)
-        self.stock_num = stock_num
-
-    # Only select the 20 least AH multiple stocks on the most current snapshot data
-    def stock_select(self, CN_data_info, HK_data_info, AH_info):
-        cur = AH_info[-1]
-        if np.sum(~np.isnan(cur)) < self.stock_num:
-            return 'keep'
-        else:
-            return np.argsort(cur)[:self.stock_num]
-
-
-# Select the A stocks with highest AH multiplier
-class HighestCurAH(BasicStrategy):
-    def __init__(self, trans_fee, stock_num, market, long):
-        super().__init__(trans_fee, market, long)
-        self.stock_num = stock_num
-
-    # Only select the 20 least AH multiple stocks on the most current snapshot data
-    def stock_select(self, CN_data_info, HK_data_info, AH_info):
-        cur = AH_info[-1]
-        realvalue = np.sum(~np.isnan(cur))
-        if realvalue < self.stock_num:
-            return 'keep'
-        else:
-            return np.argsort(cur)[(realvalue-self.stock_num):realvalue]
 
 
 def Simulate_Strategy(Strats, trade_freq, CN_data, HK_data, AH_multiple):
     days, tickers = CN_data.shape
-    if isinstance(Strats, BasicStrategy):
-        Strats_list = [Strats]
-    else:
+    if isinstance(Strats, CombineStrategy):
         Strats_list = Strats.Strategies
+    else:
+        Strats_list = [Strats]
 
     halted = [False]*len(Strats_list)
 
@@ -277,14 +294,14 @@ def Simulate_Strategy(Strats, trade_freq, CN_data, HK_data, AH_multiple):
 
             # Time to decide transactions
             if halted[num] or i % trade_freq == 0:
-                selects = Strat.stock_select(CN_data_info=CN_data_info, HK_data_info=HK_data_info, AH_info=AH_info)
+                selects = Strat.stock_select(CN_data_info, HK_data_info, AH_info)
                 halted[num] = (selects == 'keep')
-                Strat.transaction(selects, CN_prices, HK_prices)
+                Strat.transaction(selects, CN_prices, HK_prices, i)
             else:
                 Strat.hold_profit(CN_prices, HK_prices)
 
     for Strat in Strats_list:
         Strat.convert_ret()
 
-    if not isinstance(Strats, BasicStrategy):
+    if isinstance(Strats, CombineStrategy):
         Strats.record_merge()

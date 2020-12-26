@@ -1,7 +1,8 @@
 import pickle
-import Strategy_Def, Download
+import Strategy_Def, Download, Strats
 import numpy as np
 import matplotlib.pyplot as plt
+
 
 def main():
     # Considering the extreme markets in 2015 and 2016, we start from 2016-01-01
@@ -40,19 +41,22 @@ def main():
     trade_freq = 22
 
     # Strategies
-    Least20 = Strategy_Def.LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True)
-    Highest20 = Strategy_Def.HighestCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=False)
-    LH20_profit = Strategy_Def.CombineStrategy([Least20, Highest20], profit_merge=False)
-    Strategy_Def.Simulate_Strategy(LH20_profit, trade_freq, CN_data, HK_data, AH_multiple)
+    # Least20_A = Strats.LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True)
+    MA_Least20_A = Strats.MA_LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True,
+                                        MA_window=2*trade_freq)
+    NegaSSE_A = Strategy_Def.IndexStrategy(trans_fee=trans_fee, market='A', long=False, profit=SSECI/SSECI[0])
+
+    Decision = Strategy_Def.CombineStrategy([MA_Least20_A, NegaSSE_A], profit_merge=True)
+    Strategy_Def.Simulate_Strategy(Decision, trade_freq, CN_data, HK_data, AH_multiple)
 
     # Display
-    LH20_profit.info(dates=dates, name='Long Least 20 A Short Highest 20 A Profit')
-    Least20.info(dates=dates, name='Long Least 20 A')
-    Highest20.info(dates=dates, name='Short Highest 20 A')
+    Decision.info(dates=dates, name='Long MA Least 20 Short SSECI Merge Profit')
+    MA_Least20_A.info(dates=dates, name='Long MA Least 20')
+    NegaSSE_A.info(dates=dates, name='Short SSECI')
 
-    plt.plot(Least20.profit_record, label='Least20')
-    plt.plot(Highest20.profit_record, label='Highest20')
-    plt.plot(LH20_profit.profit_record, label='LH20 Profit')
+    plt.plot(Decision.profit_record, label='Long MA Least 20 Short SSECI Merge Profit')
+    plt.plot(MA_Least20_A.profit_record, label='Long MA Least 20')
+    plt.plot(NegaSSE_A.profit_record, label='Short SSECI')
     plt.plot(SSECI/SSECI[0], label='SSE CI')
     plt.plot(HSCEI/HSCEI[0], label='HSCEI')
     plt.title('PnL')
