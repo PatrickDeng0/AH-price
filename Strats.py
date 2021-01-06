@@ -26,7 +26,7 @@ class MA_LeastCurAH(BasicStrategy):
 
     # Only select the 20 least AH multiple stocks on the most current snapshot data
     def stock_select(self, CN_data_info, HK_data_info, AH_info):
-        if len(AH_info) < self.MA_window:
+        if len(AH_info) <= self.MA_window:
             return 'keep'
         AH_info_MA = AH_info[-self.MA_window:, :]
         cur = np.nanmean(AH_info_MA, axis=0)
@@ -62,7 +62,7 @@ class MA_HighestCurAH(BasicStrategy):
 
     # Only select the 20 least AH multiple stocks on the most current snapshot data
     def stock_select(self, CN_data_info, HK_data_info, AH_info):
-        if len(AH_info) < self.MA_window:
+        if len(AH_info) <= self.MA_window:
             return 'keep'
         AH_info_MA = AH_info[-self.MA_window:, :]
         cur = np.nanmean(AH_info_MA, axis=0)
@@ -82,7 +82,7 @@ class MA_DiffLeast_CurAH(BasicStrategy):
 
     # Only select the 20 least AH multiple stocks on the most current snapshot data
     def stock_select(self, CN_data_info, HK_data_info, AH_info):
-        if len(AH_info) < self.MA_window:
+        if len(AH_info) <= self.MA_window:
             return 'keep'
         AH_info_MA = AH_info[-self.MA_window:, :]
         AH_MAmean = np.nanmean(AH_info_MA, axis=0)

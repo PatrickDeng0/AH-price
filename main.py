@@ -54,9 +54,9 @@ def main():
     MA_Least20_A.info(dates=dates, name='Long MA Least 20')
     NegaSSE_A.info(dates=dates, name='Short SSECI')
 
-    plt.plot(Decision.profit_record, label='Long MA Least 20 Short SSECI Merge Profit')
-    plt.plot(MA_Least20_A.profit_record, label='Long MA Least 20')
-    plt.plot(NegaSSE_A.profit_record, label='Short SSECI')
+    plt.plot(Decision.value_record, label='Long MA Least 20 Short SSECI Merge Profit')
+    plt.plot(MA_Least20_A.value_record, label='Long MA Least 20')
+    plt.plot(NegaSSE_A.value_record, label='Short SSECI')
     plt.plot(SSECI/SSECI[0], label='SSE CI')
     plt.plot(HSCEI/HSCEI[0], label='HSCEI')
     plt.title('PnL')

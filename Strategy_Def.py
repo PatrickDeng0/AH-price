@@ -3,14 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def ret_2_profit(rets):
+def ret_2_value(rets):
     return np.nancumprod(rets+1)
 
 
-def profit_2_ret(profit):
-    add_profit = np.insert(profit, 0, 1)
-    profit_chg = np.diff(add_profit)
-    return profit_chg / add_profit[:-1]
+def value_2_ret(value):
+    add_value = np.insert(value, 0, 1)
+    profit_chg = np.diff(add_value)
+    return profit_chg / add_value[:-1]
 
 
 # If there is too many nan in prices, then we record these new prices as the old prices
@@ -28,32 +28,32 @@ def merge_2_prices(old_prices, prices):
 # A basic strategy object that define the describe statement of a common strategy
 class DescribeStrategy(object):
     def __init__(self):
-        # profit_record: record everyday profit
-        # trans_profit_record: record interval returns between each two transactions
-        self.profit_record = np.array([])
-        self.trans_profit_record = np.array([])
+        # value_record: record everyday profit
+        # trans_value_record: record interval returns between each two transactions
+        self.value_record = np.array([])
+        self.trans_value_record = np.array([])
         self.trans_date = np.array([], dtype=int)
         self.ret_record = np.array([])
         self.trans_ret_record = np.array([])
 
     # Get the newest profit value
     @property
-    def profit(self):
-        if len(self.profit_record) > 0:
-            return self.profit_record[-1]
+    def value(self):
+        if len(self.value_record) > 0:
+            return self.value_record[-1]
         else:
             return 1
 
     @property
-    def last_trans_profit(self):
-        if len(self.trans_profit_record) > 0:
-            return self.trans_profit_record[-1]
+    def last_trans_value(self):
+        if len(self.trans_value_record) > 0:
+            return self.trans_value_record[-1]
         else:
             return 1
 
     def convert_ret(self):
-        self.ret_record = profit_2_ret(self.profit_record)
-        self.trans_ret_record = profit_2_ret(self.trans_profit_record)
+        self.ret_record = value_2_ret(self.value_record)
+        self.trans_ret_record = value_2_ret(self.trans_value_record)
 
     def get_sharpe(self):
         # If the transactions happen in a constant frequency, then compute its sharpe
@@ -72,18 +72,18 @@ class DescribeStrategy(object):
     # Calculate the Max Drawdown and details of this strategy
     def get_mdd(self):
         former_high, mdd_high, mdd_low, mdd = 0, 0, 0, 0
-        for i in range(len(self.profit_record)):
-            if self.profit_record[i] > self.profit_record[former_high]:
+        for i in range(len(self.value_record)):
+            if self.value_record[i] > self.value_record[former_high]:
                 former_high = i
-            cur_mdd = 1 - self.profit_record[i] / self.profit_record[former_high]
+            cur_mdd = 1 - self.value_record[i] / self.value_record[former_high]
             if mdd < cur_mdd:
                 mdd = cur_mdd
                 mdd_high = former_high
                 mdd_low = i
 
         recover_date, duration = None, None
-        for i in range(mdd_high, len(self.profit_record)):
-            if self.profit_record[i] > self.profit_record[mdd_high]:
+        for i in range(mdd_high, len(self.value_record)):
+            if self.value_record[i] > self.value_record[mdd_high]:
                 recover_date = i
                 duration = recover_date - mdd_high
                 break
@@ -162,9 +162,9 @@ class BasicStrategy(DescribeStrategy):
                 ret = -ret
 
             # Update records
-            new_profit = self.profit * (1 + ret)
-            self.profit_record = np.append(self.profit_record, new_profit)
-            self.trans_profit_record = np.append(self.trans_profit_record, new_profit)
+            new_profit = self.value * (1 + ret)
+            self.value_record = np.append(self.value_record, new_profit)
+            self.trans_value_record = np.append(self.trans_value_record, new_profit)
             self.trans_date = np.append(self.trans_date, date)
 
             # Update properties
@@ -187,8 +187,8 @@ class BasicStrategy(DescribeStrategy):
             ret = -ret
 
         # Update records
-        new_profit = self.profit * (1 + ret)
-        self.profit_record = np.append(self.profit_record, new_profit)
+        new_profit = self.value * (1 + ret)
+        self.value_record = np.append(self.value_record, new_profit)
 
         # Update properties
         self.prices = prices
@@ -201,11 +201,11 @@ class IndexStrategy(BasicStrategy):
 
         # Long an index, simply record its value
         if self.long:
-            self.profit_record = profit
+            self.value_record = profit
         # Short an index, convert its value
         else:
-            self.profit_record = 1/profit
-        self.ret_record = profit_2_ret(self.profit_record)
+            self.value_record = 1/profit
+        self.ret_record = value_2_ret(self.value_record)
 
     def transaction(self, *args):
         pass
@@ -223,8 +223,8 @@ class IndexStrategy(BasicStrategy):
     # For compute the profit between transactions, we set its profit series manually
     def set_trans_dates(self, trans_date):
         self.trans_date = trans_date
-        self.trans_profit_record = self.profit_record[trans_date]
-        self.trans_ret_record = profit_2_ret(self.trans_profit_record)
+        self.trans_value_record = self.value_record[trans_date]
+        self.trans_ret_record = value_2_ret(self.trans_value_record)
 
 
 # Combine the strategies to describe their performance together
@@ -254,11 +254,11 @@ class CombineStrategy(DescribeStrategy):
             # This is trading mode
             res, res_trans = [], []
             for Strategy in self.Strategies:
-                res.append(Strategy.profit_record)
-                res_trans.append(Strategy.trans_profit_record)
+                res.append(Strategy.value_record)
+                res_trans.append(Strategy.trans_value_record)
 
-            self.profit_record = np.mean(np.array(res), axis=0)
-            self.trans_profit_record = np.mean(np.array(res_trans), axis=0)
+            self.value_record = np.mean(np.array(res), axis=0)
+            self.trans_value_record = np.mean(np.array(res_trans), axis=0)
             self.convert_ret()
 
         else:
@@ -270,10 +270,10 @@ class CombineStrategy(DescribeStrategy):
                 res_trans.append(Strategy.trans_ret_record)
 
             self.ret_record = np.nanmean(np.array(res), axis=0)
-            self.profit_record = ret_2_profit(self.ret_record)
+            self.value_record = ret_2_value(self.ret_record)
 
             self.trans_ret_record = np.nanmean(np.array(res_trans), axis=0)
-            self.trans_profit_record = ret_2_profit(self.trans_ret_record)
+            self.trans_value_record = ret_2_value(self.trans_ret_record)
 
 
 def Simulate_Strategy(Strats, trade_freq, CN_data, HK_data, AH_multiple):
