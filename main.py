@@ -63,7 +63,7 @@ def main():
     plt.legend()
     plt.show()
 
-    util.get_beta_alpha(MA_Least20_A.ret_record, -NegaSSE_A.ret_record, 'MA20', 'SSE')
+    util.get_beta_alpha(MA_Least20_A, NegaSSE_A, 'MA20', 'SSE', neutral=True)
 
 
 if __name__ == '__main__':

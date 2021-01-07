@@ -111,7 +111,8 @@ class BasicStrategy(DescribeStrategy):
     def trade_signal(self, new_positions):
         epsilon = 0.001
         sale_dict, buy_dict, hold_dict = {}, {}, {}
-        all_stock = list(set(self.positions.keys()) & set(new_positions.keys()))
+        cur, aim = set(self.positions.keys()), set(new_positions.keys())
+        all_stock = list(cur | aim)
         for stock in all_stock:
             cur_pos, aim_pos = self.positions.get(stock, 0), new_positions.get(stock, 0)
             chg = aim_pos - cur_pos

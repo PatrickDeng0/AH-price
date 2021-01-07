@@ -28,7 +28,14 @@ def merge_2_prices(old_prices, prices):
         return prices
 
 
-def get_beta_alpha(strat_ret, index_ret, strat_name, index_name):
+def get_beta_alpha(strat, index_strat, strat_name, index_name, neutral):
+    strat_ret = strat.ret_record
+    index_ret = index_strat.ret_record
+    if neutral:
+        index_ret = -index_ret
+    if hasattr(strat, 'MA_window'):
+        strat_ret = strat_ret[strat.MA_window:]
+        index_ret = index_ret[strat.MA_window:]
     valid_loca = np.where(~np.isnan(index_ret) & ~(np.isnan(strat_ret)))
     cut_strat_ret, cut_index_ret = strat_ret[valid_loca], index_ret[valid_loca]
 
