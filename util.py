@@ -16,6 +16,13 @@ def dict_2_array(dict):
     return np.array(list(dict.keys())).astype(int), np.array(list(dict.values()))
 
 
+def sw_2_position(stocks, weights):
+    res = {}
+    for i in range(len(stocks)):
+        res[stocks[i]] = weights[i]
+    return res
+
+
 # If there is too many nan in prices, then we record these new prices as the old prices
 def merge_2_prices(old_prices, prices):
     if len(old_prices) == len(prices):
@@ -55,3 +62,9 @@ def get_weights(cur, info, *args):
         return cur / np.nansum(cur)
     elif info == 'nega_cw':
         return 1/cur / np.nansum(1/cur)
+
+
+def get_MA(data, info, *args):
+    length = data.shape[0]
+    if info == 'fair':
+        return np.nanmean(data, axis=0)

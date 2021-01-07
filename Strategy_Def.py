@@ -1,7 +1,5 @@
-import pickle
-import Download, util
+import util
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 # A basic strategy object that define the describe statement of a common strategy
@@ -149,7 +147,8 @@ class BasicStrategy(DescribeStrategy):
             hold_stock, hold_weights = util.dict_2_array(hold_dict)
 
             # Get position change returns
-            sale_ret = prices[sale_stock] / self.prices[sale_stock] - 1 - self.trans_fee
+            print(buy_weights, sale_weights, hold_weights)
+            sale_ret = prices[sale_stock] / self.prices[sale_stock] - 1
             buy_ret = np.repeat(-self.trans_fee, len(buy_stock))
             hold_ret = prices[hold_stock] / self.prices[hold_stock] - 1
             ret = np.dot(sale_ret, sale_weights) + np.dot(buy_ret, buy_weights) + np.dot(hold_ret, hold_weights)
