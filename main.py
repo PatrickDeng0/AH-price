@@ -43,7 +43,7 @@ def main():
     # Strategies
     # Least20_A = Strats.LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True)
     MA_Least20_A = Strats.MA_LeastNumCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True,
-                                           MA_window=2*trade_freq)
+                                           MA_window=2*trade_freq, weights='posi_cw')
     NegaSSE_A = Strategy_Def.IndexStrategy(trans_fee=trans_fee, market='A', long=False, profit=SSECI/SSECI[0])
 
     Decision = Strategy_Def.CombineStrategy([MA_Least20_A, NegaSSE_A], profit_merge=True)

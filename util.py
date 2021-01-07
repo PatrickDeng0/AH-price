@@ -48,5 +48,10 @@ def get_beta_alpha(strat, index_strat, strat_name, index_name, neutral):
     plt.show()
 
 
-def get_weights(cur, info):
-    pass
+def get_weights(cur, info, *args):
+    if info == 'fair':
+        return np.repeat(1/len(cur), len(cur))
+    elif info == 'posi_cw':
+        return cur / np.nansum(cur)
+    elif info == 'nega_cw':
+        return 1/cur / np.nansum(1/cur)
