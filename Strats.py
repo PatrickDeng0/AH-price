@@ -3,7 +3,7 @@ import numpy as np
 
 
 # Select the A stocks with least AH multiplier
-class LeastCurAH(BasicStrategy):
+class LeastNumCurAH(BasicStrategy):
     def __init__(self, trans_fee, stock_num, market, long):
         super().__init__(trans_fee, market, long)
         self.stock_num = stock_num
@@ -14,11 +14,16 @@ class LeastCurAH(BasicStrategy):
         if np.sum(~np.isnan(cur)) < self.stock_num:
             return 'keep'
         else:
-            return np.argsort(cur)[:self.stock_num]
+            stocks = np.argsort(cur)[:self.stock_num]
+            weights = 1/self.stock_num
+            res = {}
+            for item in stocks:
+                res[item] = weights
+            return res
 
 
 # Select the A stocks with Least AH multiplier in Moving Average window
-class MA_LeastCurAH(BasicStrategy):
+class MA_LeastNumCurAH(BasicStrategy):
     def __init__(self, trans_fee, stock_num, market, long, MA_window):
         super().__init__(trans_fee, market, long)
         self.stock_num = stock_num
@@ -34,11 +39,16 @@ class MA_LeastCurAH(BasicStrategy):
         if realvalue < self.stock_num:
             return 'keep'
         else:
-            return np.argsort(cur)[:self.stock_num]
+            stocks = np.argsort(cur)[:self.stock_num]
+            weights = 1/self.stock_num
+            res = {}
+            for item in stocks:
+                res[item] = weights
+            return res
 
 
 # Select the A stocks with highest AH multiplier
-class HighestCurAH(BasicStrategy):
+class HighestNumCurAH(BasicStrategy):
     def __init__(self, trans_fee, stock_num, market, long):
         super().__init__(trans_fee, market, long)
         self.stock_num = stock_num
@@ -50,11 +60,16 @@ class HighestCurAH(BasicStrategy):
         if realvalue < self.stock_num:
             return 'keep'
         else:
-            return np.argsort(cur)[(realvalue-self.stock_num):realvalue]
+            stocks = np.argsort(cur)[(realvalue-self.stock_num):realvalue]
+            weights = 1/self.stock_num
+            res = {}
+            for item in stocks:
+                res[item] = weights
+            return res
 
 
 # Select the A stocks with highest AH multiplier in moving average window
-class MA_HighestCurAH(BasicStrategy):
+class MA_HighestNumCurAH(BasicStrategy):
     def __init__(self, trans_fee, stock_num, market, long, MA_window):
         super().__init__(trans_fee, market, long)
         self.stock_num = stock_num
@@ -70,7 +85,12 @@ class MA_HighestCurAH(BasicStrategy):
         if realvalue < self.stock_num:
             return 'keep'
         else:
-            return np.argsort(cur)[(realvalue-self.stock_num):realvalue]
+            stocks = np.argsort(cur)[(realvalue-self.stock_num):realvalue]
+            weights = 1/self.stock_num
+            res = {}
+            for item in stocks:
+                res[item] = weights
+            return res
 
 
 # Select the A stocks with Largest AH multiplier difference against moving window
@@ -91,4 +111,9 @@ class MA_DiffLeast_CurAH(BasicStrategy):
         if realvalue < self.stock_num:
             return 'keep'
         else:
-            return np.argsort(cur)[(realvalue-self.stock_num):realvalue]
+            stocks = np.argsort(cur)[(realvalue-self.stock_num):realvalue]
+            weights = 1/self.stock_num
+            res = {}
+            for item in stocks:
+                res[item] = weights
+            return res

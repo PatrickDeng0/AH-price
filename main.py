@@ -1,5 +1,5 @@
 import pickle
-import Strategy_Def, Download, Strats
+import Strategy_Def, Download, Strats, util
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -42,8 +42,8 @@ def main():
 
     # Strategies
     # Least20_A = Strats.LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True)
-    MA_Least20_A = Strats.MA_LeastCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True,
-                                        MA_window=2*trade_freq)
+    MA_Least20_A = Strats.MA_LeastNumCurAH(trans_fee=trans_fee, stock_num=20, market='A', long=True,
+                                           MA_window=2*trade_freq)
     NegaSSE_A = Strategy_Def.IndexStrategy(trans_fee=trans_fee, market='A', long=False, profit=SSECI/SSECI[0])
 
     Decision = Strategy_Def.CombineStrategy([MA_Least20_A, NegaSSE_A], profit_merge=True)
@@ -62,6 +62,8 @@ def main():
     plt.title('PnL')
     plt.legend()
     plt.show()
+
+    util.get_beta_alpha(MA_Least20_A.ret_record, -NegaSSE_A.ret_record, 'MA20', 'SSE')
 
 
 if __name__ == '__main__':

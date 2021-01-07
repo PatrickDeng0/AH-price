@@ -1,28 +1,7 @@
-import pickle, Download
+import pickle
+import Download, util
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-def ret_2_value(rets):
-    return np.nancumprod(rets+1)
-
-
-def value_2_ret(value):
-    add_value = np.insert(value, 0, 1)
-    profit_chg = np.diff(add_value)
-    return profit_chg / add_value[:-1]
-
-
-# If there is too many nan in prices, then we record these new prices as the old prices
-def merge_2_prices(old_prices, prices):
-    if len(old_prices) == len(prices):
-        nanlocas = np.isnan(prices)
-        new_prices = prices[:]
-        new_prices[nanlocas] = old_prices[nanlocas]
-        return new_prices
-    else:
-        # If in the beginning, old_prices is empty list, then record the prices precisely
-        return prices
 
 
 # A basic strategy object that define the describe statement of a common strategy
@@ -52,8 +31,8 @@ class DescribeStrategy(object):
             return 1
 
     def convert_ret(self):
-        self.ret_record = value_2_ret(self.value_record)
-        self.trans_ret_record = value_2_ret(self.trans_value_record)
+        self.ret_record = util.value_2_ret(self.value_record)
+        self.trans_ret_record = util.value_2_ret(self.trans_value_record)
 
     def get_sharpe(self):
         # If the transactions happen in a constant frequency, then compute its sharpe
@@ -112,7 +91,7 @@ class DescribeStrategy(object):
 class BasicStrategy(DescribeStrategy):
     def __init__(self, trans_fee, market, long):
         super().__init__()
-        self.stocks = np.array([])
+        self.positions = {}
         self.prices = np.array([])
         self.trans_fee = trans_fee
         self.market = market
@@ -124,14 +103,25 @@ class BasicStrategy(DescribeStrategy):
 
     # For each stock, design the stock selection logic according to the data
     # Customize in each strategy
-    def stock_select(self, *args) -> np.ndarray:
+    def stock_select(self, *args) -> dict:
         pass
 
     # Given the new stocks to hold, calculate the trading signal to generate
     # Divided into 3 categories: to sale, to buy, and to hold
-    def trade_signal(self, stocks):
-        cur, aim = set(self.stocks), set(stocks)
-        return list(cur - aim), list(aim - cur), list(aim & cur)
+    def trade_signal(self, new_positions):
+        epsilon = 0.001
+        sale_dict, buy_dict, hold_dict = {}, {}, {}
+        all_stock = list(set(self.positions.keys()) & set(new_positions.keys()))
+        for stock in all_stock:
+            cur_pos, aim_pos = self.positions.get(stock, 0), new_positions.get(stock, 0)
+            chg = aim_pos - cur_pos
+            if chg > epsilon:
+                buy_dict[stock] = chg
+            elif chg < -epsilon:
+                sale_dict[stock] = -chg
+            if cur_pos > 0 and aim_pos > 0:
+                hold_dict[stock] = min(cur_pos, aim_pos)
+        return sale_dict, buy_dict, hold_dict
 
     def prices_select(self, CN_prices, HK_prices):
         if self.market == 'A':
@@ -141,21 +131,27 @@ class BasicStrategy(DescribeStrategy):
         return prices
 
     # Calculate the profit from transaction
-    def transaction(self, stocks, CN_prices, HK_prices, date):
+    def transaction(self, positions, CN_prices, HK_prices, date):
         prices = self.prices_select(CN_prices, HK_prices)
 
         # Selection result shows that we should hold all the stocks and wait
-        if stocks == 'keep':
+        if positions == 'keep':
             self.hold_profit(CN_prices, HK_prices)
 
         # Selection result shows that we maybe need some transactions
         else:
-            prices = merge_2_prices(self.prices, prices)
-            sale, buy, hold = self.trade_signal(stocks)
-            sale_ret = prices[sale] / self.prices[sale] - 1 - self.trans_fee
-            buy_ret = np.repeat(-self.trans_fee, len(buy))
-            hold_ret = prices[hold] / self.prices[hold] - 1
-            ret = (np.nansum(sale_ret) + np.nansum(buy_ret) + np.nansum(hold_ret)) / (len(sale)+len(buy)+len(hold))
+            # Get position changes
+            prices = util.merge_2_prices(self.prices, prices)
+            sale_dict, buy_dict, hold_dict = self.trade_signal(positions)
+            sale_stock, sale_weights = util.dict_2_array(sale_dict)
+            buy_stock, buy_weights = util.dict_2_array(buy_dict)
+            hold_stock, hold_weights = util.dict_2_array(hold_dict)
+
+            # Get position change returns
+            sale_ret = prices[sale_stock] / self.prices[sale_stock] - 1 - self.trans_fee
+            buy_ret = np.repeat(-self.trans_fee, len(buy_stock))
+            hold_ret = prices[hold_stock] / self.prices[hold_stock] - 1
+            ret = np.dot(sale_ret, sale_weights) + np.dot(buy_ret, buy_weights) + np.dot(hold_ret, hold_weights)
 
             # If we are holding short positions, reverse the return
             if not self.long:
@@ -169,16 +165,17 @@ class BasicStrategy(DescribeStrategy):
 
             # Update properties
             # Store the profit of this transaction to calculate the next transaction return
-            self.stocks = stocks
+            self.positions = positions
             self.prices = prices
 
     # Calculate the profit from holding all the remain stocks
     def hold_profit(self, CN_prices, HK_prices):
         prices = self.prices_select(CN_prices, HK_prices)
-        prices = merge_2_prices(self.prices, prices)
-        if len(self.stocks) > 0:
-            hold_ret = prices[self.stocks] / self.prices[self.stocks] - 1
-            ret = np.nansum(hold_ret) / len(self.stocks)
+        prices = util.merge_2_prices(self.prices, prices)
+        hold_stock, hold_weights = util.dict_2_array(self.positions)
+        if len(hold_stock) > 0:
+            hold_ret = prices[hold_stock] / self.prices[hold_stock] - 1
+            ret = np.dot(hold_ret, hold_weights)
         else:
             ret = 0
 
@@ -205,7 +202,7 @@ class IndexStrategy(BasicStrategy):
         # Short an index, convert its value
         else:
             self.value_record = 1/profit
-        self.ret_record = value_2_ret(self.value_record)
+        self.ret_record = util.value_2_ret(self.value_record)
 
     def transaction(self, *args):
         pass
@@ -224,7 +221,7 @@ class IndexStrategy(BasicStrategy):
     def set_trans_dates(self, trans_date):
         self.trans_date = trans_date
         self.trans_value_record = self.value_record[trans_date]
-        self.trans_ret_record = value_2_ret(self.trans_value_record)
+        self.trans_ret_record = util.value_2_ret(self.trans_value_record)
 
 
 # Combine the strategies to describe their performance together
@@ -270,10 +267,10 @@ class CombineStrategy(DescribeStrategy):
                 res_trans.append(Strategy.trans_ret_record)
 
             self.ret_record = np.nanmean(np.array(res), axis=0)
-            self.value_record = ret_2_value(self.ret_record)
+            self.value_record = util.ret_2_value(self.ret_record)
 
             self.trans_ret_record = np.nanmean(np.array(res_trans), axis=0)
-            self.trans_value_record = ret_2_value(self.trans_ret_record)
+            self.trans_value_record = util.ret_2_value(self.trans_ret_record)
 
 
 def Simulate_Strategy(Strats, trade_freq, CN_data, HK_data, AH_multiple):
