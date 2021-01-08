@@ -32,19 +32,18 @@ class DescribeStrategy(object):
         self.ret_record = util.value_2_ret(self.value_record)
         self.trans_ret_record = util.value_2_ret(self.trans_value_record)
 
-    def get_sharpe(self):
-        # If the transactions happen in a constant frequency, then compute its sharpe
-        if len(self.trans_ret_record) > 10:
-            return np.nanmean(self.trans_ret_record) / np.nanstd(self.trans_ret_record)
-
-        # If there is no transactions at all, then compute the sharpe from daily return series
-        # By default using monthly period as an epoch (22 trading days)
-        else:
-            period = 22
-            cut_ret_record = self.ret_record[-(len(self.ret_record)//period)*period:]
-            cut_ret_record = cut_ret_record.reshape((-1, period))
-            merge_ret_record = np.nansum(cut_ret_record, axis=1)
-            return np.nanmean(merge_ret_record) / np.nanstd(merge_ret_record)
+    # By default using monthly period as an epoch (22 trading days)
+    def get_sharpe(self, period=22):
+        # # If the transactions happen in a constant frequency, then compute its sharpe
+        # if len(self.trans_ret_record) > 10:
+        #     return np.nanmean(self.trans_ret_record) / np.nanstd(self.trans_ret_record)
+        #
+        # # If there is no transactions at all, then compute the sharpe from daily return series
+        # else:
+        cut_ret_record = self.ret_record[-(len(self.ret_record)//period)*period:]
+        cut_ret_record = cut_ret_record.reshape((-1, period))
+        merge_ret_record = np.nansum(cut_ret_record, axis=1)
+        return np.nanmean(merge_ret_record) / np.nanstd(merge_ret_record)
 
     # Calculate the Max Drawdown and details of this strategy
     def get_mdd(self):
@@ -147,8 +146,7 @@ class BasicStrategy(DescribeStrategy):
             hold_stock, hold_weights = util.dict_2_array(hold_dict)
 
             # Get position change returns
-            print(buy_weights, sale_weights, hold_weights)
-            sale_ret = prices[sale_stock] / self.prices[sale_stock] - 1
+            sale_ret = prices[sale_stock] / self.prices[sale_stock] - 1 - self.trans_fee
             buy_ret = np.repeat(-self.trans_fee, len(buy_stock))
             hold_ret = prices[hold_stock] / self.prices[hold_stock] - 1
             ret = np.dot(sale_ret, sale_weights) + np.dot(buy_ret, buy_weights) + np.dot(hold_ret, hold_weights)

@@ -35,7 +35,7 @@ def merge_2_prices(old_prices, prices):
         return prices
 
 
-def get_beta_alpha(strat, index_strat, strat_name, index_name, neutral):
+def get_beta_alpha(strat, index_strat, strat_name, index_name, neutral, display):
     strat_ret = strat.ret_record
     index_ret = index_strat.ret_record
     if neutral:
@@ -49,10 +49,12 @@ def get_beta_alpha(strat, index_strat, strat_name, index_name, neutral):
     polys = np.polyfit(cut_index_ret, cut_strat_ret, 1)
     xp = np.linspace(np.min(cut_index_ret), np.max(cut_index_ret), 200)
     p = np.poly1d(polys)
-    plt.plot(xp, p(xp), color='r')
-    plt.scatter(cut_index_ret, cut_strat_ret)
-    plt.title('Beta %.2f Alpha %.5f of %s -- %s' % (round(polys[0],2), round(polys[1],5), strat_name, index_name))
-    plt.show()
+    if display:
+        plt.plot(xp, p(xp), color='r')
+        plt.scatter(cut_index_ret, cut_strat_ret)
+        plt.title('Beta %.2f Alpha %.5f of %s -- %s' % (round(polys[0],2), round(polys[1],5), strat_name, index_name))
+        plt.show()
+    return polys
 
 
 def get_weights(cur, info, *args):
